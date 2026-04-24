@@ -101,31 +101,3 @@ pintos_22.04_lab_docker/
 
 ## 7. C 파일에 브레이크포인트 설정 후 디버깅 (F5)
 pintos 랩에서는 vscode기반의 디버깅을 지원하지 않습니다. 
-
----
-## 8. 새로운 Git 리포지토리에 Commit & Push 하기
-
-금주 프로젝트를 개인 Git 리포와 같은 다른 리포지토리에 업로드하려면, 기존 Git 연결을 제거하고 새롭게 초기화해야 합니다.
-
-### ✅ 완전히 새로운 Git 리포로 업로드하는 방법
-
-아래 명령어를 순서대로 실행하세요:
-
-```bash
-rm -rf .git
-git init
-git remote add origin https://github.com/myusername/my-new-repo.git
-git add .
-git commit -m "Clean start"
-git push -u origin main
-```
-
-### 📌 설명
-
-- `rm -rf .git`: 기존 Git 기록과 연결을 완전히 삭제합니다.
-- `git init`: 현재 폴더를 새로운 Git 리포지토리로 초기화합니다.
-- `git remote add origin ...`: 새로운 리포지토리 주소를 origin으로 등록합니다.
-- `git add .` 및 `git commit`: 모든 파일을 커밋합니다.
-- `git push`: 새로운 리포에 최초 업로드(Push)합니다.
-
-이 과정을 거치면 기존 리포와의 연결은 완전히 제거되고, **새로운 독립적인 프로젝트로 관리**할 수 있습니다.
