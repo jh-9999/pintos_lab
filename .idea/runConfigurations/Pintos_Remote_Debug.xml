@@ -1,5 +1,7 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Pintos Remote Debug" type="RsRemoteRunConfiguration" factoryName="Remote Debug" debuggerKind="GDB" remoteCommand="tcp:127.0.0.1:1234" symbolFile="/workspaces/pintos_22.04_lab_docker/pintos/threads/build/kernel.o" sysroot="">
+  <configuration default="false" name="Pintos Remote Debug" type="CLion_Remote" factoryName="Remote Debug" remoteCommand="tcp:127.0.0.1:1234" symbolFile="$PROJECT_DIR$/pintos/threads/build/kernel.o" sysroot="" version="1">
+    <debugger kind="GDB" isBundled="true" />
+    <pathMapping remote=":/workspaces/pintos_22.04_lab_docker" local="$PROJECT_DIR$" />
     <method v="2" />
   </configuration>
 </component>
