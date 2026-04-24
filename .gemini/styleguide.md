@@ -18,8 +18,11 @@ such as `GEN-010`, `IND-010`, `CALL-010`, `DEF-010`, `NAME-010`, `PTR-010`,
 
 ## Review Scope
 
-Only review changed lines in the pull request. Use surrounding code only to
-understand local style. Do not comment on untouched legacy code.
+Only review changed lines in `.c` and `.h` files in the pull request. Ignore
+all other file types, including Markdown, YAML, shell scripts, Makefiles,
+assembly, test metadata, configuration, and documentation files. Use
+surrounding code only to understand local style. Do not comment on untouched
+legacy code.
 
 Allowed review topics:
 
