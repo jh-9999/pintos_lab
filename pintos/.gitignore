@@ -1,0 +1,21 @@
+# Pintos build outputs
+threads/build/
+userprog/build/
+vm/build/
+filesys/build/
+
+# Top-level generated files
+TAGS
+tags
+cscope.files
+cscope.out
+cscope.in.out
+cscope.po.out
+*.tar.gz
+*~
+
+# Editor and OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
