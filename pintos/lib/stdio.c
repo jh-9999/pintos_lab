@@ -106,14 +106,14 @@ struct printf_conversion {
 
 	/* 형식을 지정할 인수 유형입니다. */
 	enum {
-		CHAR = 1,               /* 아 */
-		SHORT = 2,              /* 시간 */
+		CHAR = 1,               /* hh */
+		SHORT = 2,              /* h */
 		INT = 3,                /* (없음) */
 		INTMAX = 4,             /* j */
-		LONG = 5,               /* 엘 */
+		LONG = 5,               /* l */
 		LONGLONG = 6,           /* ll */
-		PTRDIFFT = 7,           /* 티 */
-		SIZET = 8               /* 지 */
+		PTRDIFFT = 7,           /* t */
+		SIZET = 8               /* z */
 	} type;
 };
 

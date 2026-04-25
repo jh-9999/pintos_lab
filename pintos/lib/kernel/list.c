@@ -114,7 +114,7 @@ list_prev (struct list_elem *elem) {
    list.h 상단의 예를 따르세요.
 
    for (e = list_rbegin (&foo_list); e != list_rend (&foo_list);
-   e = 목록_이전 (e))
+   e = list_prev (e))
    {
    struct foo *f = list_entry (e, struct foo, elem);
    ...f로 뭔가를 해보세요...
@@ -131,7 +131,7 @@ list_rend (struct list *list) {
    list_head()은 대체 스타일의 반복에 사용될 수 있습니다.
    목록을 통해, 예:
 
-   e = 목록_헤드(&list);
+   e = list_head (&list);
    while ((e = list_next (e)) != list_end (&list))
    {
    ...
@@ -211,30 +211,30 @@ list_push_back (struct list *list, struct list_elem *elem) {
    제거 후 ELEM에서 정의되지 않은 동작이 발생합니다. 이는 다음을 의미합니다.
    목록의 요소를 제거하는 순진한 루프는 실패합니다.
 
- ** DON 'T DO THIS **
+ ** DON'T DO THIS **
  for (e = list_begin (&list); e != list_end (&list); e = list_next (e))
  {
- ...전자로 뭔가 해보세요...
- 목록_제거(e);
+ ...do something with e...
+ list_remove (e);
  }
- ** DON 'T DO THIS **
+ ** DON'T DO THIS **
 
  다음은 요소를 반복하고 제거하는 올바른 방법 중 하나입니다.
 목록:
 
 for (e = list_begin (&list); e != list_end (&list); e = list_remove (e))
 {
-...전자로 뭔가 해보세요...
+...do something with e...
 }
 
 목록의 요소를 free()해야 한다면 다음과 같이 해야 합니다.
 더 보수적입니다. 다음은 효과적인 대체 전략입니다.
 그 경우에도:
 
-동안(!list_empty(&목록))
+while (!list_empty (&list))
 {
 struct list_elem *e = list_pop_front (&list);
-...전자로 뭔가 해보세요...
+...do something with e...
 }
 */
 struct list_elem *

@@ -5,25 +5,24 @@
  *
  * 이중 연결 리스트의 구현에는 다음이 필요하지 않습니다.
  * 동적으로 할당된 메모리를 사용합니다. 대신 각 구조는
- * 이는 잠재적인 목록 요소이므로 list_elem 구조체를 포함해야 합니다.
- * 회원. 모든 목록 함수는 이러한 `struct에서 작동합니다.
- * list_elem's. list_entry 매크로는 다음에서 변환을 허용합니다.
- * struct list_elem을 이를 포함하는 구조 객체로 다시 되돌립니다.
+ * 잠재적으로 리스트 요소가 될 각 구조체는 `struct list_elem'
+ * 멤버를 포함해야 합니다. 모든 리스트 함수는 이 `struct list_elem'에
+ * 대해 동작합니다. list_entry 매크로는 `struct list_elem'에서 이를
+ * 포함하는 구조체 객체로 다시 변환할 수 있게 해 줍니다.
 
- * 예를 들어 `struct' 목록이 필요하다고 가정해 보겠습니다.
- * 푸'. `struct foo' should contain a ` 구조체 목록_elem'
- * 회원은 다음과 같습니다.
+ * 예를 들어 `struct foo'의 리스트가 필요하다고 가정합니다.
+ * `struct foo'는 다음처럼 `struct list_elem' 멤버를 포함해야 합니다.
 
- * 구조체 foo {
- *   구조체 list_elem elem;
- *   int 바;
- *   ...다른 멤버들...
+ * struct foo {
+ *   struct list_elem elem;
+ *   int bar;
+ *   ...other members...
  * };
 
  * 그런 다음 `struct foo' 목록을 선언하고 초기화할 수 있습니다.
  * 이렇게:
 
- * 구조체 목록 foo_list;
+ * struct list foo_list;
 
  * list_init(&foo_list);
 
@@ -31,7 +30,7 @@
  * struct list_elem에서 다시 둘러싸는 것으로 변환
  * 구조. foo_list를 사용한 예는 다음과 같습니다.
 
- * 구조체 list_elem *e;
+ * struct list_elem *e;
 
  * for (e = list_begin (&foo_list); e != list_end (&foo_list);
  * e = list_next (e)) {

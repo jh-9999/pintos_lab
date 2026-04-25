@@ -44,10 +44,10 @@ struct intr_frame {
 	uint16_t ds;
 	uint16_t __pad3;
 	uint32_t __pad4;
-	/* intr-stubs.S의 intr NN_ 스텁에 의해 푸시되었습니다. */
+	/* intr-stubs.S의 intrNN_stub에 의해 푸시되었습니다. */
 	uint64_t vec_no; /* 인터럽트 벡터 수. */
 /* 때로는 CPU에 의해 푸시되기도 합니다.
-   그렇지 않으면 일관성을 위해 intr NN_ 스텁에 의해 0으로 푸시됩니다.
+   그렇지 않으면 일관성을 위해 intrNN_stub에 의해 0으로 푸시됩니다.
    CPU은 이를 `eip' 바로 아래에 두지만 여기로 옮깁니다. */
 	uint64_t error_code;
 /* CPU에 의해 푸시되었습니다.

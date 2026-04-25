@@ -38,7 +38,7 @@ struct gate {
 	unsigned ss : 16;         // 세그먼트 선택기
 	unsigned ist : 3;        // 인자 수, 인터럽트/트랩 게이트에서는 0
 	unsigned rsv1 : 5;        // 예약됨(0이어야 할 것 같아요)
-	unsigned type : 4;        // 유형(STS_ { TG, IG32, TG32 })
+	unsigned type : 4;        // 유형(STS_{TG, IG32, TG32})
 	unsigned s : 1;           // 0이어야 합니다(시스템).
 	unsigned dpl : 2;         // 설명자(새 항목을 의미) 권한 수준
 	unsigned p : 1;           // 현재의
@@ -259,10 +259,9 @@ intr_context (void) {
 	return in_external_intr;
 }
 
-/* 외부 인터럽트를 처리하는 동안
-   직전에 새로운 프로세스를 양보하는 인터럽트 핸들러
-   인터럽트에서 복귀합니다. 다른 곳에서는 호출할 수 없습니다.
-   시간. */
+/* 외부 인터럽트를 처리하는 동안, 인터럽트에서 복귀하기 직전에
+   새 프로세스에 양보하도록 인터럽트 핸들러에 지시합니다.
+   그 외의 시점에는 호출할 수 없습니다. */
 void
 intr_yield_on_return (void) {
 	ASSERT (intr_context ());
