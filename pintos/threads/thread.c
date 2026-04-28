@@ -377,10 +377,20 @@ threads_wakeup (int64_t ticks) {
 void
 thread_set_priority (int new_priority) {
 	struct thread *cur = thread_current ();
+
 	cur->base_priority = new_priority;
-	if (cur->priority < new_priority) {
-		cur->priority = new_priority;
+
+	//donations 확인해서 priority 올바르게 갱신
+	cur->priority = cur->base_priority;
+	if (!list_empty(&cur->donations)) {
+		int max_priority = list_entry (list_min (&cur->donations,
+				cmp_priority, NULL), struct thread, d_elem)->priority;
+
+		if (cur->priority < max_priority) {
+			cur->priority = max_priority;
+		}
 	}
+
 	thread_yield_if_needed();
 }
 
