@@ -212,6 +212,7 @@ thread_create (const char *name, int priority,
 
 	/* 실행 대기열에 추가합니다. */
 	thread_unblock (t);
+	thread_yield_if_needed();
 
 	return tid;
 }
@@ -246,7 +247,7 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+	list_insert_ordered (&ready_list, &t->elem, cmp_priority, NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -309,9 +310,28 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+		list_insert_ordered (&ready_list, &curr->elem, cmp_priority, NULL);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
+}
+
+/* 만약 ready_list 중 현재 스레드보다 우선순위가 높은게 있으면 preemption(yield 호출) 한다. */
+void
+thread_yield_if_needed (void) {
+	if (list_empty (&ready_list))
+		return;
+
+	list_sort(&ready_list, cmp_priority, NULL); // Priority Donation 떄문
+	struct thread *peek_t =
+		list_entry (list_front (&ready_list), struct thread, elem);
+	bool need_preemption = peek_t->priority > thread_current ()->priority;
+
+	if (need_preemption) {
+		if (intr_context ())
+			intr_yield_on_return ();
+		else
+			thread_yield ();
+	}
 }
 
 /* WAKEUP_TICK까지 현재 스레드를 재우고 스케줄 대상에서 제외한다. */
@@ -350,12 +370,18 @@ threads_wakeup (int64_t ticks) {
 			break;
 		}
 	}
+	thread_yield_if_needed();
 }
 
 /* 현재 스레드의 우선순위를 NEW_PRIORITY 으로 설정합니다. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	struct thread *cur = thread_current ();
+	cur->base_priority = new_priority;
+	if (cur->priority < new_priority) {
+		cur->priority = new_priority;
+	}
+	thread_yield_if_needed();
 }
 
 /* 현재 스레드의 우선순위를 반환합니다. */
@@ -452,7 +478,10 @@ init_thread (struct thread *t, const char *name, int priority) {
 	strlcpy (t->name, name, sizeof t->name);
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
+	t->base_priority = priority;
 	t->magic = THREAD_MAGIC;
+	t->wait_on_lock = NULL;
+	list_init(&t->donations);
 }
 
 /* 예약할 다음 스레드를 선택하고 반환합니다. 해야 한다
@@ -464,8 +493,8 @@ static struct thread *
 next_thread_to_run (void) {
 	if (list_empty (&ready_list))
 		return idle_thread;
-	else
-		return list_entry (list_pop_front (&ready_list), struct thread, elem);
+	list_sort(&ready_list, cmp_priority, NULL); // Priority Donation 때매 정렬 필요
+	return list_entry (list_pop_front (&ready_list), struct thread, elem);
 }
 
 /* iretq를 사용하여 스레드 시작 */
@@ -643,4 +672,15 @@ cmp_wakeup_ticks (const struct list_elem *a, const struct list_elem *b,
 		return ta->priority > tb->priority;
 
 	return ta->wakeup_ticks < tb->wakeup_ticks;
+}
+
+// 햇갈릴 수 있는데, 큰게 앞에 위치하도록 조건을 명세의 반대로 한다.
+bool
+cmp_priority(const struct list_elem* a, const struct list_elem* b,
+		void *aux UNUSED) {
+	const struct thread *ta = list_entry (a, struct thread, elem);
+	const struct thread *tb = list_entry (b, struct thread, elem);
+
+	//같은 priority는 false를 반환해서 기존 항목 뒤에 간다.
+	return ta->priority > tb->priority;
 }
