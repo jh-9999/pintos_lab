@@ -28,8 +28,8 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
-static bool cmp_sema_priority(const struct list_elem* a,
-		const struct list_elem* b,
+static bool cmp_sema_priority (const struct list_elem *a,
+		const struct list_elem *b,
 		void *aux UNUSED);
 
 /* 세마포어 SEMA을 VALUE로 초기화합니다. 세마포어는
@@ -109,12 +109,12 @@ sema_up (struct semaphore *sema) {
 
 	old_level = intr_disable ();
 	if (!list_empty (&sema->waiters)) {
-		list_sort (&sema->waiters, cmp_priority, NULL); // Priority Donation 떄문
+		list_sort (&sema->waiters, cmp_priority, NULL); // Priority Donation 때문
 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
 					struct thread, elem));
 	}
 	sema->value++;
-	thread_yield_if_needed();
+	thread_yield_if_needed ();
 	intr_set_level (old_level);
 }
 
@@ -194,7 +194,7 @@ lock_acquire (struct lock *lock) {
 	struct thread *cur = thread_current ();
 	if (holder != NULL) {
 		cur->wait_on_lock = lock;
-		list_push_back(&holder->donations, &cur->d_elem);
+		list_push_back (&holder->donations, &cur->d_elem);
 		if (holder->priority < cur->priority) {
 			holder->priority = cur->priority;
 		}
@@ -251,19 +251,19 @@ lock_release (struct lock *lock) {
 
 	struct list_elem *e;
 	e = list_begin (&cur->donations);
-	while (e != list_end(&cur->donations)) {
-		struct thread *t = list_entry(e, struct thread, d_elem);
+	while (e != list_end (&cur->donations)) {
+		struct thread *t = list_entry (e, struct thread, d_elem);
 
 		if (t->wait_on_lock == lock) {
-			e = list_remove(e);
+			e = list_remove (e);
 		} else {
-			e = list_next(e);
+			e = list_next (e);
 		}
 	}
 
 	cur->priority = cur->base_priority;
 
-	if (!list_empty(&cur->donations)) {
+	if (!list_empty (&cur->donations)) {
 		int max_priority = list_entry (list_min (&cur->donations,
 				cmp_priority, NULL), struct thread, d_elem)->priority;
 
@@ -356,7 +356,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	if (!list_empty (&cond->waiters)) {
-		list_sort (&cond->waiters, cmp_sema_priority, NULL);//Priority Donation 때문
+		list_sort (&cond->waiters, cmp_sema_priority, NULL); // Priority Donation 때문
 		sema_up (&list_entry (list_pop_front (&cond->waiters),
 					struct semaphore_elem, elem)->semaphore);
 	}
@@ -379,7 +379,7 @@ cond_broadcast (struct condition *cond, struct lock *lock) {
 
 
 static bool
-cmp_sema_priority(const struct list_elem* a, const struct list_elem* b,
+cmp_sema_priority (const struct list_elem *a, const struct list_elem *b,
 		void *aux UNUSED) {
 	struct semaphore_elem *sa = list_entry (a, struct semaphore_elem, elem);
 	struct semaphore_elem *sb = list_entry (b, struct semaphore_elem, elem);
