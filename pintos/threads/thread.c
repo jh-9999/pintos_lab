@@ -28,6 +28,9 @@
    실행할 준비가 되었지만 실제로 실행되지는 않습니다. */
 static struct list ready_list;
 
+/* 특정 타이머 tick까지 잠든 스레드 목록. */
+static struct list sleep_list;
+
 /* 유휴 스레드. */
 static struct thread *idle_thread;
 
@@ -62,6 +65,8 @@ static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
+static bool cmp_wakeup_ticks (const struct list_elem *a,
+		const struct list_elem *b, void *aux UNUSED);
 
 /* T가 유효한 스레드를 가리키는 것으로 나타나면 true를 반환합니다. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -108,6 +113,7 @@ thread_init (void) {
 /* 전역 스레드 컨텍스트를 초기화한다. */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list);
 	list_init (&destruction_req);
 
 	/* 실행 중인 스레드에 대한 스레드 구조를 설정합니다. */
@@ -306,6 +312,44 @@ thread_yield (void) {
 		list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
+}
+
+/* WAKEUP_TICK까지 현재 스레드를 재우고 스케줄 대상에서 제외한다. */
+void
+thread_sleep (int64_t wakeup_tick) {
+	struct thread *curr = thread_current ();
+	enum intr_level old_level;
+
+	ASSERT (!intr_context ());
+
+	old_level = intr_disable ();
+	if (curr != idle_thread) {
+		curr->wakeup_ticks = wakeup_tick;
+		list_insert_ordered (&sleep_list, &curr->elem, cmp_wakeup_ticks, NULL);
+		thread_block ();
+	}
+	intr_set_level (old_level);
+}
+
+/* 깨어날 tick에 도달한 모든 sleeping thread를 ready 상태로 옮긴다. */
+void
+threads_wakeup (int64_t ticks) {
+	struct list_elem *e;
+
+	ASSERT (intr_context ());
+	ASSERT (intr_get_level () == INTR_OFF);
+
+	e = list_begin (&sleep_list);
+	while (e != list_end (&sleep_list)) {
+		struct thread *t = list_entry (e, struct thread, elem);
+
+		if (t->wakeup_ticks <= ticks) {
+			e = list_remove (e);
+			thread_unblock (t);
+		} else {
+			break;
+		}
+	}
 }
 
 /* 현재 스레드의 우선순위를 NEW_PRIORITY 으로 설정합니다. */
@@ -587,4 +631,16 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+static bool
+cmp_wakeup_ticks (const struct list_elem *a, const struct list_elem *b,
+		void *aux UNUSED) {
+	const struct thread *ta = list_entry (a, struct thread, elem);
+	const struct thread *tb = list_entry (b, struct thread, elem);
+
+	if (ta->wakeup_ticks == tb->wakeup_ticks)
+		return ta->priority > tb->priority;
+
+	return ta->wakeup_ticks < tb->wakeup_ticks;
 }

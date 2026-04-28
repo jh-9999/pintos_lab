@@ -91,6 +91,7 @@ struct thread {
 	enum thread_status status;          /* 스레드 상태. */
 	char name[16];                      /* 이름(디버깅용). */
 	int priority;                       /* 우선순위. */
+	int64_t wakeup_ticks;               /* 깨워야 할 타이머 tick. */
 
 	/* thread.c와 synch.c 간에 공유됩니다. */
 	struct list_elem elem;              /* 목록 요소. */
@@ -132,6 +133,8 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+void thread_sleep (int64_t wakeup_tick);
+void threads_wakeup (int64_t ticks);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
