@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include "threads/interrupt.h"
 #ifdef VM
 #include "vm/vm.h"
@@ -91,9 +92,23 @@ struct thread {
 	enum thread_status status;          /* 스레드 상태. */
 	char name[16];                      /* 이름(디버깅용). */
 	int priority;                       /* 우선순위. */
+	int64_t wakeup_ticks;               /* 깨워야 할 타이머 tick. */
 
 	/* thread.c와 synch.c 간에 공유됩니다. */
 	struct list_elem elem;              /* 목록 요소. */
+
+	/* priority는 Donation으로 변하기 때문에, 순수하게 해당 스레드의 priority를 저장하는 역할 */
+	int base_priority;
+
+	/* 특정 락에 대기하고 있는 경우, 그 락을 바라본다. 그 외에는 NULL. */
+	struct lock *wait_on_lock;
+
+	/* d_elem 요소를 가짐.
+	   Donors(후원자)의 목록, Multiple Donation 표현. 정렬 순서를 보장하지 않음 */
+	struct list donations;
+
+	/* donations로 관리되는 리스트, elem과는 별개로 관리되어야 하므로 필요함 */
+	struct list_elem d_elem;
 
 #ifdef USERPROG
 	/* userprog/process.c가 소유합니다. */
@@ -132,6 +147,9 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+void thread_yield_if_needed (void);
+void thread_sleep (int64_t wakeup_tick);
+void threads_wakeup (int64_t ticks);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
@@ -142,5 +160,11 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+
+bool cmp_priority_more (const struct list_elem *a,
+		const struct list_elem *b, void *aux UNUSED);
+bool cmp_donors_priority_more (const struct list_elem *a,
+		const struct list_elem *b, void *aux UNUSED);
+void refresh_priority_in_donors (void);
 
 #endif /* threads/thread.h */

@@ -140,9 +140,18 @@ bool list_empty (struct list *);
 /* 여러 가지 잡다한. */
 void list_reverse (struct list *);
 
-/* 주어진 두 목록 요소 A와 B의 값을 비교합니다.
-   보조 데이터 AUX. A가 B보다 작으면 true를 반환합니다.
-   A가 B보다 크거나 같으면 false입니다. */
+/* 주어진 두 목록 요소 A와 B를 AUX 보조 데이터와 함께 비교한다.
+   true를 반환하면 A가 B보다 앞에 와야 한다.
+   false를 반환하면 A가 B보다 앞에 오지 않는다. 즉, B가 A보다 앞서거나 같다.
+
+   A와 B가 같은 값일 때, 앞에서 탐색한다고 가정하면
+   true를 반환하면 앞에 붙어서 항상 먼저 찾아진다.
+   false를 반환하면 같은 값 요소들의 뒤에 붙어서 round-robin 순서를 유지한다.
+
+   구현체 네이밍 기준:
+   {name}_less: 값이 작은 것이 앞에 위치한다.
+   {name}_more: 값이 큰 것이 앞에 위치한다. 큰 값을 작은 것으로 처리하므로
+                min은 가장 큰 값, max는 가장 작은 값을 반환한다. */
 typedef bool list_less_func (const struct list_elem *a,
                              const struct list_elem *b,
                              void *aux);
