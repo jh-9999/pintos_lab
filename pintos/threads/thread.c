@@ -24,6 +24,10 @@
    이 값을 수정하지 마십시오. */
 #define THREAD_BASIC 0xd42df210
 
+#define NICE_DEFAULT 0
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 /* THREAD_READY 상태인 프로세스, 즉 프로세스 목록
    실행할 준비가 되었지만 실제로 실행되지는 않습니다. */
 static struct list ready_list;
@@ -43,6 +47,9 @@ static struct lock tid_lock;
 /* 스레드 소멸 요청 */
 static struct list destruction_req;
 
+/* MLFQS 계산을 위해 전체 스레드를 순회하는 목록. */
+static struct list all_thread_list;
+
 /* 통계. */
 static long long idle_ticks;    /* idle에서 보낸 타이머 틱 수. */
 static long long kernel_ticks;  /* 커널 스레드에서 보낸 타이머 틱 수. */
@@ -57,6 +64,8 @@ static unsigned thread_ticks;   /* 마지막 양보 이후의 타이머 틱 수.
    커널 명령줄 옵션 "-o mlfqs"로 제어됩니다. */
 bool thread_mlfqs;
 
+static fp32_t load_avg;         /* 최근 1분 동안 실행 준비가 된 thread 수의 이동 평균. */
+
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -67,6 +76,7 @@ static void schedule (void);
 static tid_t allocate_tid (void);
 static bool cmp_wakeup_ticks_less (const struct list_elem *a,
 		const struct list_elem *b, void *aux UNUSED);
+static void thread_mlfqs_recalc_priority (struct thread *t);
 
 /* T가 유효한 스레드를 가리키는 것으로 나타나면 true를 반환합니다. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -115,12 +125,17 @@ thread_init (void) {
 	list_init (&ready_list);
 	list_init (&sleep_list);
 	list_init (&destruction_req);
+	list_init (&all_thread_list);
+	load_avg = fp (0);
 
 	/* 실행 중인 스레드에 대한 스레드 구조를 설정합니다. */
 	initial_thread = running_thread ();
 	init_thread (initial_thread, "main", PRI_DEFAULT);
 	initial_thread->status = THREAD_RUNNING;
 	initial_thread->tid = allocate_tid ();
+
+	if (thread_mlfqs)
+		list_push_back (&all_thread_list, &initial_thread->q_elem);
 }
 
 /* 인터럽트를 활성화하여 선점형 스레드 스케줄링을 시작합니다.
@@ -210,6 +225,12 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
+	if (thread_mlfqs) {
+		enum intr_level old_level = intr_disable ();
+		list_push_back (&all_thread_list, &t->q_elem);
+		intr_set_level (old_level);
+	}
+
 	/* 실행 대기열에 추가합니다. */
 	thread_unblock (t);
 	thread_yield_if_needed ();
@@ -295,6 +316,8 @@ thread_exit (void) {
 	/* 상태를 죽어가는 것으로 설정하고 다른 프로세스를 예약하면 됩니다.
 	   schedule_tail()을 호출하는 동안 우리는 파괴될 것입니다. */
 	intr_disable ();
+	if (thread_mlfqs)
+		list_remove (&thread_current ()->q_elem);
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
 }
@@ -376,9 +399,11 @@ threads_wakeup (int64_t ticks) {
 /* 현재 스레드의 우선순위를 NEW_PRIORITY 으로 설정합니다. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->base_priority = new_priority;
-	refresh_priority_in_donors ();
-	thread_yield_if_needed ();
+	if (!thread_mlfqs) {
+		thread_current ()->base_priority = new_priority;
+		refresh_priority_in_donors ();
+		thread_yield_if_needed ();
+	}
 }
 
 /* 현재 스레드의 우선순위를 반환합니다. */
@@ -389,29 +414,27 @@ thread_get_priority (void) {
 
 /* 현재 스레드의 nice 값을 NICE 으로 설정합니다. */
 void
-thread_set_nice (int nice UNUSED) {
-	/* TODO: 구현 내용은 여기에 있습니다. */
+thread_set_nice (int nice) {
+	thread_current ()->nice = nice;
+	thread_mlfqs_recalc_priorities ();
 }
 
 /* 현재 스레드의 nice 값을 반환합니다. */
 int
 thread_get_nice (void) {
-	/* TODO: 구현 내용은 여기에 있습니다. */
-	return 0;
+	return thread_current ()->nice;
 }
 
 /* 시스템 로드 평균의 100배를 반환합니다. */
 int
 thread_get_load_avg (void) {
-	/* TODO: 구현 내용은 여기에 있습니다. */
-	return 0;
+	return fp_int_rnd (fp_mul_i (load_avg, 100));
 }
 
 /* 현재 스레드의 Recent_cpu 값의 100배를 반환합니다. */
 int
 thread_get_recent_cpu (void) {
-	/* TODO: 구현 내용은 여기에 있습니다. */
-	return 0;
+	return fp_int_rnd (fp_mul_i (thread_current ()->recent_cpu, 100));
 }
 
 /* 유휴 스레드. 실행할 준비가 된 다른 스레드가 없을 때 실행됩니다.
@@ -474,8 +497,20 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->status = THREAD_BLOCKED;
 	strlcpy (t->name, name, sizeof t->name);
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
-	t->priority = priority;
-	t->base_priority = priority;
+	if (thread_mlfqs) {
+		if (t == initial_thread) {
+			t->recent_cpu = fp (0);
+			t->nice = NICE_DEFAULT;
+		} else {
+			struct thread *parent = thread_current ();
+			t->recent_cpu = parent->recent_cpu;
+			t->nice = parent->nice;
+		}
+		thread_mlfqs_recalc_priority (t);
+	} else {
+		t->priority = priority;
+		t->base_priority = priority;
+	}
 	t->magic = THREAD_MAGIC;
 	t->wait_on_lock = NULL;
 	list_init (&t->donations);
@@ -708,5 +743,62 @@ void refresh_priority_in_donors (void) {
 		if (cur->priority < max_priority) {
 			cur->priority = max_priority;
 		}
+	}
+}
+
+/* 모든 스레드를 순회하면서 MLFQS 기반 우선순위를 재계산한다. */
+void
+thread_mlfqs_recalc_priorities (void) {
+	enum intr_level old_level = intr_disable ();
+
+	for (struct list_elem *e = list_begin (&all_thread_list);
+			e != list_end (&all_thread_list); e = list_next (e)) {
+		struct thread *t = list_entry (e, struct thread, q_elem);
+		thread_mlfqs_recalc_priority (t);
+	}
+
+	thread_yield_if_needed ();
+	intr_set_level (old_level);
+}
+
+static void
+thread_mlfqs_recalc_priority (struct thread *t) {
+	t->priority = PRI_MAX
+			- fp_int_trunc (fp_div_i (t->recent_cpu, 4))
+			- (t->nice * 2);
+
+	t->priority = MIN (PRI_MAX, t->priority);
+	t->priority = MAX (PRI_MIN, t->priority);
+}
+
+void
+thread_mlfqs_incr_recent_cpu (void) {
+	ASSERT (intr_context ());
+	ASSERT (intr_get_level () == INTR_OFF);
+
+	struct thread *curr = thread_current ();
+	if (curr != idle_thread)
+		curr->recent_cpu = fp_add_i (curr->recent_cpu, 1);
+}
+
+void
+thread_mlfqs_recalc_sched_queue (void) {
+	ASSERT (intr_context ());
+	ASSERT (intr_get_level () == INTR_OFF);
+
+	size_t ready_threads = list_size (&ready_list);
+	if (thread_current () != idle_thread)
+		ready_threads++;
+
+	load_avg = fp_add (
+			fp_mul (fp_div (fp (59), fp (60)), load_avg),
+			fp_mul_i (fp_div (fp (1), fp (60)), ready_threads));
+
+	for (struct list_elem *e = list_begin (&all_thread_list);
+			e != list_end (&all_thread_list); e = list_next (e)) {
+		struct thread *t = list_entry (e, struct thread, q_elem);
+		fp32_t coefficient = fp_div (fp_mul_i (load_avg, 2),
+				fp_add_i (fp_mul_i (load_avg, 2), 1));
+		t->recent_cpu = fp_add_i (fp_mul (coefficient, t->recent_cpu), t->nice);
 	}
 }

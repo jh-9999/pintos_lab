@@ -192,7 +192,7 @@ lock_acquire (struct lock *lock) {
 
 	struct thread *holder = lock->holder;
 	struct thread *cur = thread_current ();
-	if (holder != NULL) {
+	if (!thread_mlfqs && holder != NULL) {
 		cur->wait_on_lock = lock;
 		list_push_back (&holder->donations, &cur->d_elem);
 
@@ -246,19 +246,21 @@ lock_release (struct lock *lock) {
 
 	struct thread *cur = thread_current ();
 
-	struct list_elem *e;
-	e = list_begin (&cur->donations);
-	while (e != list_end (&cur->donations)) {
-		struct thread *t = list_entry (e, struct thread, d_elem);
+	if (!thread_mlfqs) {
+		struct list_elem *e;
+		e = list_begin (&cur->donations);
+		while (e != list_end (&cur->donations)) {
+			struct thread *t = list_entry (e, struct thread, d_elem);
 
-		if (t->wait_on_lock == lock) {
-			e = list_remove (e);
-		} else {
-			e = list_next (e);
+			if (t->wait_on_lock == lock) {
+				e = list_remove (e);
+			} else {
+				e = list_next (e);
+			}
 		}
-	}
 
-	refresh_priority_in_donors ();
+		refresh_priority_in_donors ();
+	}
 
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);

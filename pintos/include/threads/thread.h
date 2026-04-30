@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "threads/fixed-point.h"
 #include "threads/interrupt.h"
 #ifdef VM
 #include "vm/vm.h"
@@ -110,6 +111,11 @@ struct thread {
 	/* donations로 관리되는 리스트, elem과는 별개로 관리되어야 하므로 필요함 */
 	struct list_elem d_elem;
 
+	/* 4.4BSD Scheduler를 위한 필드 */
+	int nice;
+	fp32_t recent_cpu;
+	struct list_elem q_elem;
+
 #ifdef USERPROG
 	/* userprog/process.c가 소유합니다. */
 	uint64_t *pml4;                     /* 페이지 맵 레벨 4 */
@@ -166,5 +172,9 @@ bool cmp_priority_more (const struct list_elem *a,
 bool cmp_donors_priority_more (const struct list_elem *a,
 		const struct list_elem *b, void *aux UNUSED);
 void refresh_priority_in_donors (void);
+
+void thread_mlfqs_recalc_priorities (void);
+void thread_mlfqs_incr_recent_cpu (void);
+void thread_mlfqs_recalc_sched_queue (void);
 
 #endif /* threads/thread.h */

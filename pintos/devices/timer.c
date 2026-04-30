@@ -126,6 +126,14 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
 	threads_wakeup (ticks);
+
+	if (thread_mlfqs) {
+		thread_mlfqs_incr_recent_cpu ();
+		if (ticks % TIMER_FREQ == 0)
+			thread_mlfqs_recalc_sched_queue ();
+		if (ticks % 4 == 0)
+			thread_mlfqs_recalc_priorities ();
+	}
 }
 
 /* LOOPS번 반복하는 동안 타이머 틱이 하나 넘게 지나면 true,
