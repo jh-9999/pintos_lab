@@ -171,7 +171,7 @@ bool cmp_priority_more (const struct list_elem *a,
 		const struct list_elem *b, void *aux UNUSED);
 bool cmp_donors_priority_more (const struct list_elem *a,
 		const struct list_elem *b, void *aux UNUSED);
-void refresh_priority_in_donors (void);
+void thread_donors_recalc_priorities (void);
 
 void thread_mlfqs_recalc_priorities (void);
 void thread_mlfqs_incr_recent_cpu (void);

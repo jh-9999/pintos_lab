@@ -401,7 +401,7 @@ void
 thread_set_priority (int new_priority) {
 	if (!thread_mlfqs) {
 		thread_current ()->base_priority = new_priority;
-		refresh_priority_in_donors ();
+		thread_donors_recalc_priorities ();
 		thread_yield_if_needed ();
 	}
 }
@@ -525,7 +525,7 @@ static struct thread *
 next_thread_to_run (void) {
 	if (list_empty (&ready_list))
 		return idle_thread;
-	list_sort (&ready_list, cmp_priority_more, NULL); // Priority Donation 때문에 정렬 필요
+	list_sort (&ready_list, cmp_priority_more, NULL); // list_pop_front를 해야하므로 정렬
 	return list_entry (list_pop_front (&ready_list), struct thread, elem);
 }
 
@@ -730,7 +730,8 @@ cmp_donors_priority_more (const struct list_elem *a, const struct list_elem *b,
 /* priority를 donations를 순회하면서 올바르게 보정함.
    donations에 변화가 생기거나,
    lock chain?의 root의 우선순위 변경이 발생했을 때 항상 실행되어야 함. */
-void refresh_priority_in_donors (void) {
+void
+thread_donors_recalc_priorities (void) {
 	struct thread *cur = thread_current ();
 
 	cur->priority = cur->base_priority;
