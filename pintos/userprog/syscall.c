@@ -17,8 +17,8 @@ struct syscall_entry {
 
 	/* return value (optional, default: NO_RETURN_VAL) */
 	/* 반환값이 필요한 경우 handle_{syscall_name} 함수에서
-	 * 설정함 */
-	uint64_t rtn_val;
+	   설정함 */
+	uint64_t return_value;
 
 	/* arguments */
 	/* Linux x86-64 system call ABI에선 인자를 6개로 제한함 */
@@ -78,15 +78,15 @@ syscall_handler (struct intr_frame *f) {
 	init_syscall_entry (f, &entry);
 	dispatch_syscall (f, &entry);
 
-	if (entry.rtn_val != NO_RETURN_VAL) {
-		f->R.rax = entry.rtn_val;
+	if (entry.return_value != NO_RETURN_VAL) {
+		f->R.rax = entry.return_value;
 	}
 }
 
 static void
 init_syscall_entry (struct intr_frame *f, struct syscall_entry *entry) {
 	entry->syscall_num = f->R.rax;
-	entry->rtn_val = NO_RETURN_VAL;
+	entry->return_value = NO_RETURN_VAL;
 	entry->args[0] = f->R.rdi;
 	entry->args[1] = f->R.rsi;
 	entry->args[2] = f->R.rdx;
