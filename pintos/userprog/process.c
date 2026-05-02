@@ -27,6 +27,8 @@ static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 
+#define MAX_ARGC 128
+
 /* initd와 다른 프로세스를 위한 일반 프로세스 초기화 함수. */
 static void
 process_init (void) {
@@ -155,16 +157,82 @@ error:
 	thread_exit ();
 }
 
+static int
+parse_command_line (char *cmdline, char **argv) {
+	char delimiter[] = " \t\n";
+	char *token;
+	char *save_ptr;
+	int count = 0;
+
+	token = strtok_r (cmdline, delimiter, &save_ptr);
+	if (token == NULL)
+		return -1;
+
+	while (token != NULL && count < MAX_ARGC - 1) {
+		argv[count] = token;
+		count++;
+		token = strtok_r (NULL, delimiter, &save_ptr);
+	}
+	argv[count] = NULL;
+	return count;
+}
+
+static void
+setup_argument_stack (char **argv, int argc, struct intr_frame *if_) {
+	int count = argc - 1;
+	char *arg_addr[MAX_ARGC];
+
+	while (count >= 0) {
+		char *item = argv[count];
+		size_t len = strlen (item) + 1;
+		if_->rsp -= len;
+
+		memcpy ((void *) if_->rsp, item, len);
+		arg_addr[count] = (char *) if_->rsp;
+		count--;
+	}
+	arg_addr[argc] = NULL;
+
+	while (if_->rsp % sizeof (uint64_t) != 0) {
+		if_->rsp--;
+		*(uint8_t *) if_->rsp = 0;
+	}
+
+	count = argc;
+	while (count >= 0) {
+		if_->rsp -= sizeof (uint64_t);
+		memcpy ((void *) if_->rsp, &arg_addr[count], sizeof (arg_addr[count]));
+		count--;
+	}
+
+	char *start_pt = (char *) if_->rsp;
+	if_->R.rdi = (uint64_t) argc;
+	if_->R.rsi = (uint64_t) start_pt;
+
+	while (if_->rsp % sizeof (uint64_t) != 0) {
+		if_->rsp--;
+		*(uint8_t *) if_->rsp = 0;
+	}
+
+	uint64_t zero = 0;
+	if_->rsp -= sizeof (uint64_t);
+	memcpy ((void *) if_->rsp, &zero, sizeof (zero));
+}
+
 /* 현재 실행 컨텍스트를 f_name으로 전환한다.
  * 실패하면 -1을 반환한다. */
 int
 process_exec (void *f_name) {
+	if (f_name == NULL)
+		return -1;
+
 	char *file_name = f_name;
 	bool success;
 
 	/* thread 구조체 안의 intr_frame은 사용할 수 없다.
 	 * 현재 스레드가 다시 스케줄될 때 실행 정보를 그 멤버에 저장하기 때문이다. */
 	struct intr_frame _if;
+	memset (&_if, 0, sizeof (_if));
 	_if.ds = _if.es = _if.ss = SEL_UDSEG;
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
@@ -172,14 +240,25 @@ process_exec (void *f_name) {
 	/* 먼저 현재 컨텍스트를 제거한다. */
 	process_cleanup ();
 
+	char *argv[MAX_ARGC];
+	int argc = parse_command_line (file_name, argv);
+	if (argc == -1) {
+		palloc_free_page (file_name);
+		return -1;
+	}
+
 	/* 그런 다음 바이너리를 로드한다. */
-	success = load (file_name, &_if);
+	success = load (argv[0], &_if);
 
 	/* load에 실패했으면 종료한다. */
-	palloc_free_page (file_name);
-	if (!success)
+	if (!success) {
+		palloc_free_page (file_name);
 		return -1;
+	}
 
+	setup_argument_stack (argv, argc, &_if);
+
+	palloc_free_page (file_name);
 	/* 전환된 프로세스를 시작한다. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -197,6 +276,8 @@ int
 process_wait (tid_t child_tid UNUSED) {
 	/* XXX: 힌트) process_wait(initd)에서 Pintos가 종료된다. process_wait를
 	 * XXX:       구현하기 전에는 여기에 무한 루프를 추가하는 것을 권장한다. */
+	while (1) {
+	}
 	return -1;
 }
 
