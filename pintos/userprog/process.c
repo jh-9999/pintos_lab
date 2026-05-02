@@ -226,7 +226,7 @@ process_exec (void *f_name) {
 	ASSERT (f_name != NULL);
 
 	char *file_name = f_name;
-	bool success = false;
+	bool success;
 
 	/* thread 구조체 안의 intr_frame은 사용할 수 없다.
 	 * 현재 스레드가 다시 스케줄될 때 실행 정보를 그 멤버에 저장하기 때문이다. */
@@ -241,16 +241,20 @@ process_exec (void *f_name) {
 
 	char *argv[MAX_ARGC];
 	int argc = parse_command_line (file_name, argv);
-	if (argc != -1) {
-		/* 그런 다음 바이너리를 로드한다. */
-		success = load (argv[0], &_if);
-		if (success)
-			setup_argument_stack (argv, argc, &_if);
+	if (argc == -1) {
+		palloc_free_page (file_name);
+		return -1;
 	}
 
+	/* 그런 다음 바이너리를 로드한다. */
+	success = load (argv[0], &_if);
 	palloc_free_page (file_name);
+
+	/* load에 실패했으면 종료한다. */
 	if (!success)
 		return -1;
+
+	setup_argument_stack (argv, argc, &_if);
 
 	/* 전환된 프로세스를 시작한다. */
 	do_iret (&_if);
