@@ -45,9 +45,9 @@ static void handle_write (struct intr_frame *, struct syscall_entry *);
 static void handle_seek (struct intr_frame *, struct syscall_entry *);
 static void handle_tell (struct intr_frame *, struct syscall_entry *);
 static void handle_close (struct intr_frame *, struct syscall_entry *);
-static void *get_next_page_if_valid (void *ptr);
-static bool is_valid_user_buffer (void *buf, size_t size);
-static bool is_valid_user_string (char *str);
+static void *get_next_page_if_valid (void *);
+static bool is_valid_user_buffer (void *, size_t);
+static bool is_valid_user_string (char *);
 
 /* 시스템 콜.
  *
@@ -253,13 +253,13 @@ handle_close (struct intr_frame *f UNUSED, struct syscall_entry *entry UNUSED) {
 static bool
 is_valid_user_buffer (void *buf, size_t size) {
 	void *p = buf;
+	/* 산술 연산 시에는 uintptr_t 변환이 안전해보임. */
+	void *buf_end = (void *) ((uintptr_t) p + size);
 
 	if (size <= 0) {
 		return get_next_page_if_valid (p) != NULL;
 	}
 
-	/* 산술 연산 시에는 uintptr_t 변환이 안전해보임. */
-	void *buf_end = (void *) ((uintptr_t) p + size);
 	while (p < buf_end) {
 		/* 유효하면 다음 페이지, 아니면 NULL 반환. */
 		p = get_next_page_if_valid (p);
@@ -282,8 +282,7 @@ is_valid_user_string (char *str) {
 			return false;
 		}
 
-		/* 현재 페이지 내부를 순회하며 문자열의 끝이 있는지
-		   검사. */
+		/* 현재 페이지 내부를 순회하며 문자열의 끝이 있는지 검사. */
 		while (p < page_end) {
 			if (*p == '\0') {
 				return true;
@@ -291,18 +290,17 @@ is_valid_user_string (char *str) {
 			p++;
 		}
 
-		/* 다음 page 검사 진행. */
+		/* 다음 페이지 검사 진행. */
 		p = next_p;
 	}
 }
 
-/* 해당 ptr의 page가 유효한지 확인하고,
-   다음 페이지를 반환한다.
-   구현의 편의를 위해 분리한 함수다.
-   is_valid_user_* 외에는 사용하는 걸 추천하지 않음.
-   리턴하는 다음 페이지 주소가 유효하지 않을 수 있음.
-   유효 시 다음 page 주소를 반환한다.
-   그렇지 않으면 NULL을 반환한다. */
+/* 해당 ptr의 페이지가 유효한지 확인하고,
+   유효 시 다음 페이지 주소를 반환, 그렇지 않으면 NULL을 반환한다.
+
+   구현의 편의를 위해 분리한 함수라서, is_valid_user_* 에서만 사용 추천
+   리턴하는 다음 페이지 주소가 유효하지 않을 수 있음을 주의하기
+   */
 static void *
 get_next_page_if_valid (void *ptr) {
 	if (ptr == NULL) {
@@ -313,10 +311,9 @@ get_next_page_if_valid (void *ptr) {
 	if (!is_user_vaddr (ptr)) {
 		return NULL;
 	}
-	/* thread가 가지는 유저 가상 주소(pml4 필드)가
-	   unmapped 상태인가? */
+	/* thread가 가지는 유저 가상 주소(pml4 필드)가 unmapped 상태인가? */
 	if (pml4_get_page (thread_current ()->pml4, ptr) == NULL) {
 		return NULL;
 	}
-	return (void *) (uintptr_t) pg_round_up (ptr);
+	return pg_round_up (ptr);
 }
