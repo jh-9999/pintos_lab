@@ -318,5 +318,5 @@ get_next_page_if_valid (void *ptr) {
 	if (pml4_get_page (thread_current ()->pml4, ptr) == NULL) {
 		return NULL;
 	}
-	return (void *) (uintptr_t) pg_round_up (ptr);
+	return pg_round_up (ptr);
 }
