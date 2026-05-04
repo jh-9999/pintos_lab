@@ -171,7 +171,7 @@ handle_exit (struct intr_frame *f UNUSED, struct syscall_entry *entry) {
 	int status = entry->args[0];
 
 	
-	thread_exit ();
+	exit_process (status);
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
