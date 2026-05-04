@@ -322,7 +322,7 @@ setup_argument_stack (char **argv, int argc, struct intr_frame *if_) {
  * 실패하면 -1을 반환한다. */
 int
 process_exec (void *f_name) {
-	char *cmd_line = f_name;
+	char *file_name = f_name;
 	char *argv[MAX_ARGC];
 	int argc;
 	bool success;
@@ -338,10 +338,9 @@ process_exec (void *f_name) {
 	/* 먼저 현재 컨텍스트를 제거한다. */
 	process_cleanup ();
 
-	char *argv[MAX_ARGC];
-	int argc = parse_command_line (cmd_line, argv);
+	argc = parse_command_line (file_name, argv);
 	if (argc == -1) {
-		palloc_free_page (cmd_line);
+		palloc_free_page (file_name);
 		return -1;
 	}
 
@@ -350,13 +349,13 @@ process_exec (void *f_name) {
 
 	/* load에 실패했으면 종료한다. */
 	if (!success) {
-		palloc_free_page (cmd_line);
+		palloc_free_page (file_name);
 		return -1;
 	}
 
 	setup_argument_stack (argv, argc, &_if);
 
-	palloc_free_page (cmd_line);
+	palloc_free_page (file_name);
 	/* 전환된 프로세스를 시작한다. */
 	do_iret (&_if);
 	NOT_REACHED ();

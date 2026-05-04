@@ -537,7 +537,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->child_status = NULL;
 	t->running_file = NULL;
 	t->next_fd = 2;
-	list_init(&t->children)
+	list_init(&t->children);
 #endif
 }
 

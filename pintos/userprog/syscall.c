@@ -1,16 +1,20 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
+#include <string.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/loader.h"
+#include "threads/palloc.h"
 #include "userprog/gdt.h"
+#include "userprog/process.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "threads/mmu.h"
 #include "lib/kernel/stdio.h"
+#include "filesys/file.h"
 #include "filesys/filesys.h"
 
 
@@ -159,7 +163,7 @@ dispatch_syscall (struct intr_frame *f, struct syscall_entry *entry) {
 
 static void
 exit_process (int status) {
-	printf ("%s: exit(%d)\n", thread_current ()->name, status);
+	thread_current ()->exit_status = status;
 	thread_exit ();
 }
 
@@ -174,13 +178,13 @@ static void
 handle_exit (struct syscall_entry *entry) {
 	int status = entry->args[0];
 
-	exit_with_status(status);
+	thread_current()->exit_status = status;
 	exit_process (status);
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_fork (struct intr_frame *f, struct syscall_entry *entry UNUSED) {
+handle_fork (struct intr_frame *f, struct syscall_entry *entry) {
 	const char *thread_name = (const char*) entry->args[0];
 
 	if (!is_valid_user_string(thread_name)) {
@@ -188,18 +192,20 @@ handle_fork (struct intr_frame *f, struct syscall_entry *entry UNUSED) {
 		return;
 	}
 	entry->return_value = process_fork (thread_name, f);
+	entry->should_return_value = true;
 	return;
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_exec (struct syscall_entry *entry UNUSED) {
+handle_exec (struct syscall_entry *entry) {
 	const char *cmd_line = (const char *) entry->args[0];
 	char *cmd_copy;
 
-	if (!is_valid_user_string (cmd_line))
-		exit_with_status (-1);
-	
+	if (!is_valid_user_string (cmd_line)) {
+		exit_process (-1);
+	}
+
 	cmd_copy = palloc_get_page (0);
 	if (cmd_copy == NULL) {
 		entry->return_value = -1;
@@ -209,14 +215,15 @@ handle_exec (struct syscall_entry *entry UNUSED) {
 
 	entry->return_value = process_exec (cmd_copy);
 	if (entry->return_value == -1) {
-		exit_with_status (-1);
+		exit_process (-1);
 	}
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_wait (struct syscall_entry *entry UNUSED) {
+handle_wait (struct syscall_entry *entry) {
 	entry->return_value = process_wait((tid_t) entry->args[0]);
+	entry->should_return_value= true;
 	return;
 }
 

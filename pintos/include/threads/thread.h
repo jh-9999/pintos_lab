@@ -27,7 +27,7 @@ enum thread_status {
 typedef int tid_t;
 #define TID_ERROR ((tid_t) -1)          /* tid_t의 오류 값. */
 
-#ifndef USERPROG
+#ifdef USERPROG
 struct child_status {
 	tid_t tid;
 	int exit_status;
@@ -134,7 +134,7 @@ struct thread {
 	bool load_success;
 	int exit_status;
 
-#ifndef USERPROG
+#ifdef USERPROG
 	/* userprog/process.c가 소유합니다. */
 	uint64_t *pml4;                     /* 페이지 맵 레벨 4 */
 	struct thread *parent;
