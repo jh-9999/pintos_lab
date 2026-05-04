@@ -11,6 +11,7 @@
 #include "threads/vaddr.h"
 #include "threads/mmu.h"
 #include "lib/kernel/stdio.h"
+#include "filesys/filesys.h"
 
 
 #define NO_RETURN_VAL (-1)
@@ -191,9 +192,16 @@ handle_wait (struct intr_frame *f UNUSED, struct syscall_entry *entry UNUSED) {
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
 handle_create (struct intr_frame *f UNUSED,
-		struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+		struct syscall_entry *entry) {
+	const char *file = (const char *) entry->args[0];
+	off_t initial_size = entry->args[1];
+
+	if (file == NULL) {
+		entry->return_value = false;
+		return;
+	}
+
+	entry->return_value = filesys_create (file, initial_size);
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
