@@ -216,9 +216,16 @@ handle_create (struct syscall_entry *entry) {
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_remove (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+handle_remove (struct syscall_entry *entry ) {
+	const char *file = (const char *) entry->args[0];
+
+	entry->should_return_value = true;
+	
+	if (!is_valid_user_string ((char *) file)) {
+		exit_process (-1);
+	}
+
+	entry->return_value = filesys_remove(file);
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
