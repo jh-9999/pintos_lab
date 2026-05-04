@@ -1,0 +1,8 @@
+# Disable Git line-ending conversion by default.
+* -text
+
+# Source files edited locally should keep Linux line endings.
+*.c text eol=lf
+*.h text eol=lf
+*.S text eol=lf
+*.s text eol=lf
