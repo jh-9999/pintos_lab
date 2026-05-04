@@ -25,11 +25,14 @@
 
 #define pg_no(va) ((uint64_t) (va) >> PGBITS)
 
-/* 가장 가까운 페이지 경계로 반올림합니다. */
+/* page-aligned가 아니면 다음 페이지 경계로 올림합니다. */
 #define pg_round_up(va) ((void *) (((uint64_t) (va) + PGSIZE - 1) & ~PGMASK))
 
-/* 가장 가까운 페이지 경계로 내림합니다. */
+/* 이전 페이지 경계로 내림합니다. */
 #define pg_round_down(va) (void *) ((uint64_t) (va) & ~PGMASK)
+
+/* 항상 다음 페이지 경계로 이동합니다. */
+#define pg_next(va) ((void *) (((uint64_t) pg_round_down(va)) + PGSIZE))
 
 /* 커널 가상 주소 시작 */
 #define KERN_BASE LOADER_KERN_BASE
