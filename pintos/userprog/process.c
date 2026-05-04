@@ -290,8 +290,8 @@ int
 process_wait (tid_t child_tid UNUSED) {
 	/* XXX: 힌트) process_wait(initd)에서 Pintos가 종료된다. process_wait를
 	 * XXX:       구현하기 전에는 여기에 무한 루프를 추가하는 것을 권장한다. */
-	for (int i = 1000000000; i >= 0; i--) {
-		barrier ();
+	for (int i = 0; i < 100000; i++) {
+		thread_yield ();
 	}
 	return -1;
 }
