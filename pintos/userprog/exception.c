@@ -74,6 +74,7 @@ kill (struct intr_frame *f) {
 	   알려준다. */
 	switch (f->cs) {
 		case SEL_UCSEG:
+			thread_current ()->exit_status = -1;
 			/* 사용자 코드 세그먼트이므로 예상대로 사용자 예외다.
 			   사용자 프로세스를 종료한다. */
 			printf ("%s: dying due to interrupt %#04llx (%s).\n",
