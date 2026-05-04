@@ -333,7 +333,7 @@ is_valid_user_buffer (void *buf, size_t size) {
 	}
 
 	while (p < buf_end) {
-		/* 유효하면 다음 페이지, 아니면 NULL 반환. */
+		/* 페이지가 유효하면 다음 페이지, 아니면 NULL 반환. */
 		p = get_next_page_if_valid (p);
 		if (p == NULL) {
 			return false;
@@ -347,15 +347,14 @@ is_valid_user_string (char *str) {
 	char *p = str;
 
 	while (true) {
-		/* 유효하면 다음 페이지, 아니면 NULL 반환. */
+		/* 페이지가 유효하면 다음 페이지, 아니면 NULL 반환. */
 		char *next_p = get_next_page_if_valid (p);
-		char *page_end = pg_round_up (p);
 		if (next_p == NULL) {
 			return false;
 		}
 
 		/* 현재 페이지 내부를 순회하며 문자열의 끝이 있는지 검사. */
-		while (p < page_end) {
+		while (p < next_p) {
 			if (*p == '\0') {
 				return true;
 			}
@@ -366,7 +365,6 @@ is_valid_user_string (char *str) {
 		p = next_p;
 	}
 }
-
 /* 해당 ptr의 페이지가 유효한지 확인하고,
    유효 시 다음 페이지 주소를 반환, 그렇지 않으면 NULL을 반환한다.
 
@@ -383,9 +381,11 @@ get_next_page_if_valid (void *ptr) {
 	if (!is_user_vaddr (ptr)) {
 		return NULL;
 	}
+
 	/* thread가 가지는 유저 가상 주소(pml4 필드)가 unmapped 상태인가? */
 	if (pml4_get_page (thread_current ()->pml4, ptr) == NULL) {
 		return NULL;
 	}
-	return pg_round_up (ptr);
+
+	return pg_next (ptr);
 }
