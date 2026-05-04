@@ -42,6 +42,9 @@ process_init (void) {
 tid_t
 process_create_initd (const char *file_name) {
 	char *fn_copy;
+	char *prog_copy;
+	char *prog_name;
+	char *save_ptr;
 	tid_t tid;
 
 	/* FILE_NAME의 복사본을 만든다.
@@ -51,8 +54,19 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	/* "progname foo var" 형태로 들어오는 값 중 프로그램 이름만 추출  */
+	prog_copy = palloc_get_page (0);
+	if (prog_copy == NULL) {
+		palloc_free_page (fn_copy);
+		return TID_ERROR;
+	}
+	strlcpy (prog_copy, file_name, PGSIZE);
+	prog_name = strtok_r (prog_copy, " ", &save_ptr);
+
 	/* FILE_NAME을 실행할 새 스레드를 만든다. */
-	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create (prog_name, PRI_DEFAULT, initd, fn_copy);
+	/* thread_create 에서 prog_name 문자열을 복사하여 사용하므로 free */
+	palloc_free_page (prog_copy); 
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 	return tid;

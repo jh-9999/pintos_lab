@@ -10,6 +10,9 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "threads/mmu.h"
+#include "lib/kernel/stdio.h"
+#include "filesys/filesys.h"
+
 
 #define NO_RETURN_VAL (-1)
 
@@ -150,6 +153,12 @@ dispatch_syscall (struct intr_frame *f, struct syscall_entry *entry) {
 	}
 }
 
+static void
+exit_process (int status) {
+	printf ("%s: exit(%d)\n", thread_current ()->name, status);
+	thread_exit ();
+}
+
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
 handle_halt (struct intr_frame *f UNUSED, struct syscall_entry *entry UNUSED) {
@@ -158,9 +167,11 @@ handle_halt (struct intr_frame *f UNUSED, struct syscall_entry *entry UNUSED) {
 }
 
 static void
-handle_exit (struct intr_frame *f UNUSED, struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+handle_exit (struct intr_frame *f UNUSED, struct syscall_entry *entry) {
+	int status = entry->args[0];
+
+	
+	exit_process (status);
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
@@ -187,9 +198,15 @@ handle_wait (struct intr_frame *f UNUSED, struct syscall_entry *entry UNUSED) {
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
 handle_create (struct intr_frame *f UNUSED,
-		struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+		struct syscall_entry *entry) {
+	const char *file = (const char *) entry->args[0];
+	off_t initial_size = entry->args[1];
+
+	if (!is_valid_user_string ((char *) file)) {
+		exit_process (-1);
+	}
+
+	entry->return_value = filesys_create (file, initial_size);
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
@@ -224,10 +241,24 @@ handle_read (struct intr_frame *f UNUSED, struct syscall_entry *entry UNUSED) {
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_write (struct intr_frame *f UNUSED, struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+handle_write (struct intr_frame *f UNUSED, struct syscall_entry *entry) {
+	int fd = entry->args[0];
+	const void *buffer = (const void *) entry->args[1];
+	size_t size = entry->args[2];
+	
+	if (!is_valid_user_buffer ((void *) buffer, size)) {
+		exit_process (-1);
+	}
+
+	if (fd == 1) {
+		putbuf (buffer, size);
+		entry->return_value = size;
+		return;
+	}
+
+	entry->return_value = -1;
 }
+
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
