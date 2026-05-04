@@ -248,14 +248,16 @@ process_exec (void *f_name) {
 
 	/* 그런 다음 바이너리를 로드한다. */
 	success = load (argv[0], &_if);
-	palloc_free_page (file_name);
 
 	/* load에 실패했으면 종료한다. */
-	if (!success)
+	if (!success) {
+		palloc_free_page (file_name);
 		return -1;
+	}
 
 	setup_argument_stack (argv, argc, &_if);
 
+	palloc_free_page (file_name);
 	/* 전환된 프로세스를 시작한다. */
 	do_iret (&_if);
 	NOT_REACHED ();
