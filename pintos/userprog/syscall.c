@@ -153,6 +153,12 @@ dispatch_syscall (struct intr_frame *f, struct syscall_entry *entry) {
 	}
 }
 
+static void
+exit_process (int status) {
+	printf ("%s: exit(%d)\n", thread_current ()->name, status);
+	thread_exit ();
+}
+
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
 handle_halt (struct intr_frame *f UNUSED, struct syscall_entry *entry UNUSED) {
@@ -164,7 +170,7 @@ static void
 handle_exit (struct intr_frame *f UNUSED, struct syscall_entry *entry) {
 	int status = entry->args[0];
 
-	printf ("%s: exit(%d)\n", thread_current ()->name, status);
+	
 	thread_exit ();
 }
 
@@ -196,9 +202,8 @@ handle_create (struct intr_frame *f UNUSED,
 	const char *file = (const char *) entry->args[0];
 	off_t initial_size = entry->args[1];
 
-	if (file == NULL) {
-		entry->return_value = false;
-		return;
+	if (!is_valid_user_string ((char *) file)) {
+		exit_process (-1);
 	}
 
 	entry->return_value = filesys_create (file, initial_size);
@@ -240,6 +245,10 @@ handle_write (struct intr_frame *f UNUSED, struct syscall_entry *entry) {
 	int fd = entry->args[0];
 	const void *buffer = (const void *) entry->args[1];
 	size_t size = entry->args[2];
+	
+	if (!is_valid_user_buffer ((void *) buffer, size)) {
+		exit_process (-1);
+	}
 
 	if (fd == 1) {
 		putbuf (buffer, size);
