@@ -1,16 +1,20 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
+#include <string.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/loader.h"
+#include "threads/palloc.h"
 #include "userprog/gdt.h"
+#include "userprog/process.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "threads/mmu.h"
 #include "lib/kernel/stdio.h"
+#include "filesys/file.h"
 #include "filesys/filesys.h"
 
 
@@ -36,10 +40,10 @@ struct syscall_entry {
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 static void init_syscall_entry (struct intr_frame *, struct syscall_entry *);
-static void dispatch_syscall (struct syscall_entry *);
+static void dispatch_syscall (struct intr_frame *, struct syscall_entry *);
 static void handle_halt (struct syscall_entry *);
 static void handle_exit (struct syscall_entry *);
-static void handle_fork (struct syscall_entry *);
+static void handle_fork (struct intr_frame *, struct syscall_entry *);
 static void handle_exec (struct syscall_entry *);
 static void handle_wait (struct syscall_entry *);
 static void handle_create (struct syscall_entry *);
@@ -87,7 +91,7 @@ syscall_handler (struct intr_frame *f) {
 	struct syscall_entry entry;
 
 	init_syscall_entry (f, &entry);
-	dispatch_syscall (&entry);
+	dispatch_syscall (f, &entry);
 
 	if (entry.should_return_value) {
 		f->R.rax = entry.return_value;
@@ -108,7 +112,7 @@ init_syscall_entry (struct intr_frame *f, struct syscall_entry *entry) {
 }
 
 static void
-dispatch_syscall (struct syscall_entry *entry) {
+dispatch_syscall (struct intr_frame *f, struct syscall_entry *entry) {
 	switch (entry->syscall_num) {
 		case SYS_HALT:
 			handle_halt (entry);
@@ -117,7 +121,7 @@ dispatch_syscall (struct syscall_entry *entry) {
 			handle_exit (entry);
 			break;
 		case SYS_FORK:
-			handle_fork (entry);
+			handle_fork (f, entry);
 			break;
 		case SYS_EXEC:
 			handle_exec (entry);
@@ -159,7 +163,7 @@ dispatch_syscall (struct syscall_entry *entry) {
 
 static void
 exit_process (int status) {
-	printf ("%s: exit(%d)\n", thread_current ()->name, status);
+	thread_current ()->exit_status = status;
 	thread_exit ();
 }
 
@@ -174,29 +178,53 @@ static void
 handle_exit (struct syscall_entry *entry) {
 	int status = entry->args[0];
 
-	
+	thread_current()->exit_status = status;
 	exit_process (status);
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_fork (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+handle_fork (struct intr_frame *f, struct syscall_entry *entry) {
+	const char *thread_name = (const char*) entry->args[0];
+
+	if (!is_valid_user_string(thread_name)) {
+		entry->return_value = -1;
+		return;
+	}
+	entry->return_value = process_fork (thread_name, f);
+	entry->should_return_value = true;
+	return;
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_exec (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+handle_exec (struct syscall_entry *entry) {
+	const char *cmd_line = (const char *) entry->args[0];
+	char *cmd_copy;
+
+	if (!is_valid_user_string (cmd_line)) {
+		exit_process (-1);
+	}
+
+	cmd_copy = palloc_get_page (0);
+	if (cmd_copy == NULL) {
+		entry->return_value = -1;
+		return;
+	}
+	strlcpy (cmd_copy, cmd_line, PGSIZE);
+
+	entry->return_value = process_exec (cmd_copy);
+	if (entry->return_value == -1) {
+		exit_process (-1);
+	}
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_wait (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+handle_wait (struct syscall_entry *entry) {
+	entry->return_value = process_wait((tid_t) entry->args[0]);
+	entry->should_return_value= true;
+	return;
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
@@ -282,8 +310,16 @@ handle_tell (struct syscall_entry *entry UNUSED) {
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
 handle_close (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+	int fd = (int) entry->args[0];
+	struct thread *curr = thread_current();
+
+	if (fd >= 2 && fd < FD_MAX && curr->fd_table[fd] != NULL) {
+		file_close (curr->fd_table[fd]);
+		curr->fd_table[fd] = NULL;
+		if (fd < curr->next_fd)
+			curr->next_fd = fd;
+	}
+	return;
 }
 
 static bool

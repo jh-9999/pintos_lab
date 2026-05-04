@@ -145,6 +145,8 @@ thread_init (void) {
 	initial_thread->status = THREAD_RUNNING;
 	initial_thread->tid = allocate_tid ();
 
+	sema_init (&initial_thread->load_sema, 0);
+
 	if (thread_mlfqs)
 		list_push_back (&all_thread_list, &initial_thread->q_elem);
 }
@@ -528,7 +530,15 @@ init_thread (struct thread *t, const char *name, int priority) {
 	}
 	t->magic = THREAD_MAGIC;
 	t->wait_on_lock = NULL;
+	sema_init (&t->load_sema, 0);
 	list_init (&t->donations);
+#ifdef USERPROG
+	t->parent = NULL;
+	t->child_status = NULL;
+	t->running_file = NULL;
+	t->next_fd = 2;
+	list_init(&t->children);
+#endif
 }
 
 /* 예약할 다음 스레드를 선택하고 반환합니다. 해야 한다

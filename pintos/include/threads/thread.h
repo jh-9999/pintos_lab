@@ -7,10 +7,12 @@
 #include <stdbool.h>
 #include "threads/fixed-point.h"
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
 
+struct file;
 
 /* 스레드 수명 주기의 상태입니다. */
 enum thread_status {
@@ -25,10 +27,22 @@ enum thread_status {
 typedef int tid_t;
 #define TID_ERROR ((tid_t) -1)          /* tid_t의 오류 값. */
 
+#ifdef USERPROG
+struct child_status {
+	tid_t tid;
+	int exit_status;
+	bool waited;
+	bool exited;
+	struct semaphore wait_sema;
+	struct list_elem elem;
+};
+#endif
+
 /* 스레드 우선순위. */
 #define PRI_MIN 0                       /* 가장 낮은 우선순위. */
 #define PRI_DEFAULT 31                  /* 기본 우선순위. */
 #define PRI_MAX 63                      /* 가장 높은 우선순위. */
+#define FD_MAX 32
 
 /* 커널 스레드 또는 사용자 프로세스.
  *
@@ -116,9 +130,19 @@ struct thread {
 	fp32_t recent_cpu;
 	struct list_elem q_elem;
 
+	struct semaphore load_sema;
+	bool load_success;
+	int exit_status;
+
 #ifdef USERPROG
 	/* userprog/process.c가 소유합니다. */
 	uint64_t *pml4;                     /* 페이지 맵 레벨 4 */
+	struct thread *parent;
+	struct list children;
+	struct child_status *child_status;
+	struct file *running_file;
+	struct file *fd_table[FD_MAX];
+	int next_fd;
 #endif
 #ifdef VM
 	/* 스레드가 소유한 전체 가상 메모리에 대한 테이블입니다. */
