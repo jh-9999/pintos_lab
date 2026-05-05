@@ -188,12 +188,14 @@ static void
 handle_fork (struct intr_frame *f, struct syscall_entry *entry) {
 	const char *thread_name = (const char*) entry->args[0];
 
+	entry->should_return_value = true;
+
 	if (!is_valid_user_string(thread_name)) {
 		entry->return_value = -1;
 		return;
 	}
 	entry->return_value = process_fork (thread_name, f);
-	entry->should_return_value = true;
+	
 	return;
 }
 
@@ -202,6 +204,8 @@ static void
 handle_exec (struct syscall_entry *entry) {
 	const char *cmd_line = (const char *) entry->args[0];
 	char *cmd_copy;
+
+	entry->should_return_value = true;
 
 	if (!is_valid_user_string (cmd_line)) {
 		exit_process (-1);
@@ -223,8 +227,10 @@ handle_exec (struct syscall_entry *entry) {
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
 handle_wait (struct syscall_entry *entry) {
-	entry->return_value = process_wait((tid_t) entry->args[0]);
 	entry->should_return_value= true;
+	
+	entry->return_value = process_wait((tid_t) entry->args[0]);
+
 	return;
 }
 
