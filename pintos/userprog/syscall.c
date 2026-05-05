@@ -299,9 +299,19 @@ handle_open (struct syscall_entry *entry) {
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_filesize (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+handle_filesize (struct syscall_entry *entry) {
+	int fd = entry->args[0];
+	struct thread *cur = thread_current ();
+
+	entry->should_return_value = true;
+
+	if (fd < 2 || fd >= FD_MAX || cur->fd_table[fd] == NULL) {
+		entry->return_value = -1;
+		return;
+	}
+
+	entry->return_value = file_length (cur->fd_table[fd]);
+
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
@@ -336,16 +346,34 @@ handle_write (struct syscall_entry *entry) {
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_seek (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+handle_seek (struct syscall_entry *entry) {
+	int fd = entry->args[0];
+	off_t position = entry->args[1];
+	struct thread *curr = thread_current ();
+
+	if (fd < 2 || fd >= FD_MAX || curr->fd_table[fd] == NULL) {
+		return;
+	}
+
+	file_seek (curr->fd_table[fd], position);
+
+	
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_tell (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+handle_tell (struct syscall_entry *entry) {
+	int fd = entry->args[0];
+	struct thread *curr = thread_current ();
+
+	entry->should_return_value = true;
+
+	if (fd < 2 || fd >= FD_MAX || curr->fd_table[fd] == NULL) {
+		entry->return_value = -1;
+		return;
+	}
+
+	entry->return_value = file_tell (curr->fd_table[fd]);
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
