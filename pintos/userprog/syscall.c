@@ -16,6 +16,7 @@
 #include "lib/kernel/stdio.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "devices/input.h"
 
 
 struct syscall_entry {
@@ -318,7 +319,7 @@ handle_filesize (struct syscall_entry *entry) {
 static void
 handle_read (struct syscall_entry *entry) {
 	int fd = entry->args[0];
-	void *buffer = (const void *) entry->args[1];
+	void *buffer = (void *) entry->args[1];
 	size_t size = entry->args[2];
 	struct thread *curr = thread_current();
 	uint8_t *buf = buffer;
@@ -359,6 +360,7 @@ handle_write (struct syscall_entry *entry) {
 	int fd = entry->args[0];
 	const void *buffer = (const void *) entry->args[1];
 	size_t size = entry->args[2];
+	struct thread *curr = thread_current();
 
 	entry->should_return_value = true;
 	
@@ -366,9 +368,23 @@ handle_write (struct syscall_entry *entry) {
 		exit_process (-1);
 	}
 
-	if (fd == 1) {
+	if (fd == 0) {
+		entry->return_value = -1;
+		return;
+	}
+
+	else if (fd == 1) {
 		putbuf (buffer, size);
 		entry->return_value = size;
+		return;
+	}
+
+	else if (fd >= 2) {
+		if (fd < 2 || fd >= FD_MAX || curr->fd_table[fd] == NULL) {
+			entry->return_value = -1;
+			return;
+		}
+		entry->return_value = file_write(curr->fd_table[fd], buffer, size);
 		return;
 	}
 
@@ -410,7 +426,7 @@ handle_tell (struct syscall_entry *entry) {
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_close (struct syscall_entry *entry UNUSED) {
+handle_close (struct syscall_entry *entry) {
 	int fd = (int) entry->args[0];
 	struct thread *curr = thread_current();
 
