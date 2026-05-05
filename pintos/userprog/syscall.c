@@ -316,9 +316,41 @@ handle_filesize (struct syscall_entry *entry) {
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_read (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+handle_read (struct syscall_entry *entry) {
+	int fd = entry->args[0];
+	void *buffer = (const void *) entry->args[1];
+	size_t size = entry->args[2];
+	struct thread *curr = thread_current();
+	uint8_t *buf = buffer;
+	size_t i;
+
+
+	entry->should_return_value = true;
+
+	if (!is_valid_user_buffer ((void *) buffer, size)) {
+		exit_process (-1);
+	}
+
+	if (fd == 0) {
+		for (i = 0; i < size; i++) {
+			buf[i] = input_getc ();
+		}
+		entry->return_value = size;
+		return;
+	}
+	else if (fd == 1) {
+		entry->return_value = -1;
+		return;
+	}
+	else if (fd >= 2) {
+		if (fd < 2 || fd >= FD_MAX || curr->fd_table[fd] == NULL) {
+			entry->return_value = -1;
+			return;
+		}
+		entry->return_value = file_read(curr->fd_table[fd], buffer, size);
+		return;
+	}
+	entry->return_value = -1;
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
