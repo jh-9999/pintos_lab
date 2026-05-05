@@ -13,6 +13,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "threads/mmu.h"
+#include "threads/init.h"
 #include "lib/kernel/stdio.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -171,8 +172,7 @@ exit_process (int status) {
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
 handle_halt (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+	power_off();
 }
 
 static void
