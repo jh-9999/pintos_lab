@@ -244,7 +244,7 @@ handle_create (struct syscall_entry *entry) {
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_remove (struct syscall_entry *entry ) {
+handle_remove (struct syscall_entry *entry) {
 	const char *file = (const char *) entry->args[0];
 
 	entry->should_return_value = true;
@@ -258,10 +258,44 @@ handle_remove (struct syscall_entry *entry ) {
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_open (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+handle_open (struct syscall_entry *entry) {
+	const char *file = (const char *) entry->args[0];
+	struct file *opened_file;
+	struct thread *curr;
+	int fd;
+
+	entry->should_return_value = true;
+
+	if (!is_valid_user_string ((char *) file)) {
+		exit_process (-1);
+	}
+
+	if (file[0] == '\0') {
+		entry->return_value = -1;
+		return;
+	}
+
+	opened_file = filesys_open (file);
+	if (opened_file == NULL) {
+		entry->return_value = -1;
+		return;
+	}
+
+	curr = thread_current ();
+
+	for (fd = 2; fd < FD_MAX; fd++) {
+		if (curr->fd_table[fd] == NULL) {
+			curr->fd_table[fd] = opened_file;
+			curr->next_fd = fd + 1;
+			entry->return_value = fd;
+			return;
+		}
+	}
+
+	file_close (opened_file);
+	entry->return_value = -1;
 }
+
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
