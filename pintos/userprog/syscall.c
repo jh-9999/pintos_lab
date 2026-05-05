@@ -16,6 +16,7 @@
 #include "lib/kernel/stdio.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "devices/input.h"
 
 
 struct syscall_entry {
@@ -244,30 +245,113 @@ handle_create (struct syscall_entry *entry) {
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_remove (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+handle_remove (struct syscall_entry *entry) {
+	const char *file = (const char *) entry->args[0];
+
+	entry->should_return_value = true;
+	
+	if (!is_valid_user_string ((char *) file)) {
+		exit_process (-1);
+	}
+
+	entry->return_value = filesys_remove(file);
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_open (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+handle_open (struct syscall_entry *entry) {
+	const char *file = (const char *) entry->args[0];
+	struct file *opened_file;
+	struct thread *curr;
+	int fd;
+
+	entry->should_return_value = true;
+
+	if (!is_valid_user_string ((char *) file)) {
+		exit_process (-1);
+	}
+
+	if (file[0] == '\0') {
+		entry->return_value = -1;
+		return;
+	}
+
+	opened_file = filesys_open (file);
+	if (opened_file == NULL) {
+		entry->return_value = -1;
+		return;
+	}
+
+	curr = thread_current ();
+
+	for (fd = 2; fd < FD_MAX; fd++) {
+		if (curr->fd_table[fd] == NULL) {
+			curr->fd_table[fd] = opened_file;
+			curr->next_fd = fd + 1;
+			entry->return_value = fd;
+			return;
+		}
+	}
+
+	file_close (opened_file);
+	entry->return_value = -1;
+}
+
+
+/* TODO: 구현하면 UNUSED, ASSERT 빼기 */
+static void
+handle_filesize (struct syscall_entry *entry) {
+	int fd = entry->args[0];
+	struct thread *cur = thread_current ();
+
+	entry->should_return_value = true;
+
+	if (fd < 2 || fd >= FD_MAX || cur->fd_table[fd] == NULL) {
+		entry->return_value = -1;
+		return;
+	}
+
+	entry->return_value = file_length (cur->fd_table[fd]);
+
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_filesize (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
-}
+handle_read (struct syscall_entry *entry) {
+	int fd = entry->args[0];
+	void *buffer = (void *) entry->args[1];
+	size_t size = entry->args[2];
+	struct thread *curr = thread_current();
+	uint8_t *buf = buffer;
+	size_t i;
 
-/* TODO: 구현하면 UNUSED, ASSERT 빼기 */
-static void
-handle_read (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+
+	entry->should_return_value = true;
+
+	if (!is_valid_user_buffer ((void *) buffer, size)) {
+		exit_process (-1);
+	}
+
+	if (fd == 0) {
+		for (i = 0; i < size; i++) {
+			buf[i] = input_getc ();
+		}
+		entry->return_value = size;
+		return;
+	}
+	else if (fd == 1) {
+		entry->return_value = -1;
+		return;
+	}
+	else if (fd >= 2) {
+		if (fd < 2 || fd >= FD_MAX || curr->fd_table[fd] == NULL) {
+			entry->return_value = -1;
+			return;
+		}
+		entry->return_value = file_read(curr->fd_table[fd], buffer, size);
+		return;
+	}
+	entry->return_value = -1;
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
@@ -276,6 +360,7 @@ handle_write (struct syscall_entry *entry) {
 	int fd = entry->args[0];
 	const void *buffer = (const void *) entry->args[1];
 	size_t size = entry->args[2];
+	struct thread *curr = thread_current();
 
 	entry->should_return_value = true;
 	
@@ -283,9 +368,23 @@ handle_write (struct syscall_entry *entry) {
 		exit_process (-1);
 	}
 
-	if (fd == 1) {
+	if (fd == 0) {
+		entry->return_value = -1;
+		return;
+	}
+
+	else if (fd == 1) {
 		putbuf (buffer, size);
 		entry->return_value = size;
+		return;
+	}
+
+	else if (fd >= 2) {
+		if (fd < 2 || fd >= FD_MAX || curr->fd_table[fd] == NULL) {
+			entry->return_value = -1;
+			return;
+		}
+		entry->return_value = file_write(curr->fd_table[fd], buffer, size);
 		return;
 	}
 
@@ -295,21 +394,39 @@ handle_write (struct syscall_entry *entry) {
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_seek (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+handle_seek (struct syscall_entry *entry) {
+	int fd = entry->args[0];
+	off_t position = entry->args[1];
+	struct thread *curr = thread_current ();
+
+	if (fd < 2 || fd >= FD_MAX || curr->fd_table[fd] == NULL) {
+		return;
+	}
+
+	file_seek (curr->fd_table[fd], position);
+
+	
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_tell (struct syscall_entry *entry UNUSED) {
-	barrier ();
-	ASSERT (false); /* 현재 처리할 수 없는 syscall */
+handle_tell (struct syscall_entry *entry) {
+	int fd = entry->args[0];
+	struct thread *curr = thread_current ();
+
+	entry->should_return_value = true;
+
+	if (fd < 2 || fd >= FD_MAX || curr->fd_table[fd] == NULL) {
+		entry->return_value = -1;
+		return;
+	}
+
+	entry->return_value = file_tell (curr->fd_table[fd]);
 }
 
 /* TODO: 구현하면 UNUSED, ASSERT 빼기 */
 static void
-handle_close (struct syscall_entry *entry UNUSED) {
+handle_close (struct syscall_entry *entry) {
 	int fd = (int) entry->args[0];
 	struct thread *curr = thread_current();
 
