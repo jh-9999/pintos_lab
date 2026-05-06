@@ -131,6 +131,13 @@ page_fault (struct intr_frame *f) {
 	write = (f->error_code & PF_W) != 0;
 	user = (f->error_code & PF_U) != 0;
 
+	/* 만약 사용자 접근으로 인한 페이지 폴트라면 프로세스를 종료시킨다 */
+	if (user == true) {
+		struct thread* curr = thread_current ();
+		curr->exit_status = -1;
+		thread_exit ();
+	}
+
 #ifdef VM
 	/* 프로젝트 3 이후에서 사용한다. */
 	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))
